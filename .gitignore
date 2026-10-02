@@ -1,0 +1,39 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+
+# Dependencies
+node_modules/
+
+# Python Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Cloudflare & Build Artifacts
+.wrangler/
+
+# System & Logs
+.DS_Store
+Thumbs.db
+*.log
+
+# Project specific documentation / notes excluded from git
+SRS — Mini Call Log Service.md
+suggested_improvements.md
+suggestted_improvements.md

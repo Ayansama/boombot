@@ -1,0 +1,14 @@
+{
+  "name": "mini-call-log-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker and D1 database service for boombot call logging",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "d1:init": "wrangler d1 execute call-log-db --local --file=migrations/0001_init.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^3.114.0"
+  }
+}

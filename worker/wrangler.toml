@@ -1,0 +1,8 @@
+name = "mini-call-log-worker"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "call-log-db"
+database_id = "3230a3f1-9596-48c5-9005-e97fa65b15d1"

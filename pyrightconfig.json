@@ -1,0 +1,7 @@
+{
+  "venvPath": "bot",
+  "venv": "venv",
+  "extraPaths": [
+    "bot/venv/Lib/site-packages"
+  ]
+}
