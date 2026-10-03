@@ -20,6 +20,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.processors.frame_processor import FrameProcessor
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.deepgram.tts import DeepgramTTSService
+from pipecat.services.google.llm import GoogleLLMService
 from pipecat.services.groq.llm import GroqLLMService
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport, TransportParams
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
@@ -193,8 +194,15 @@ class TTSAudioLogger(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
+VOICE_MAP = {
+    "asteria": "aura-2-asteria-en",
+    "athena":  "aura-2-athena-en",
+    "mars":    "aura-2-mars-en",
+}
+
+
 # Bot pipeline (one per WebRTC connection)
-async def run_bot(connection: SmallWebRTCConnection):
+async def run_bot(connection: SmallWebRTCConnection, voice: str = "aura-2-asteria-en"):
     call_id    = str(uuid.uuid4())
     start_time = datetime.now(timezone.utc).isoformat()
     session    = CallSession(call_id=call_id, start_time=start_time)
@@ -208,20 +216,42 @@ async def run_bot(connection: SmallWebRTCConnection):
     )
 
     stt = DiagnosticDeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
-    llm = GroqLLMService(
-        api_key=os.getenv("GROQ_API_KEY"),
-        settings=GroqLLMService.Settings(
-            model="qwen/qwen3.8-27b",
-            system_instruction=(
-                "You are a helpful voice assistant. "
-                "Keep responses short — 1-2 sentences max."
+    llm_provider = os.getenv("LLM_PROVIDER", "groq").strip().lower()
+    system_instruction = (
+        "You are Boombot, a friendly and intelligent voice assistant. "
+        "Speak naturally as if in a live phone conversation. "
+        "Adapt your response length to the user's intent: for quick queries, greetings, or simple facts, keep answers concise (1-2 sentences). "
+        "When the user asks for explanations, stories, or detailed topics, provide a thorough, engaging response without rambling. "
+        "NEVER use markdown, bullet points, asterisks, numbered lists, emojis, or symbols, because your response is read aloud by Text-to-Speech. "
+        "Use natural spoken transitions instead of lists (like 'First', 'Also', 'Finally'). "
+        "Spell out symbols and abbreviations where helpful (say 'dollars' instead of '$', 'percent' instead of '%')."
+    )
+
+    if llm_provider == "gemini":
+        gemini_model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+        llm = GoogleLLMService(
+            api_key=os.getenv("GEMINI_API_KEY"),
+            settings=GoogleLLMService.Settings(
+                model=gemini_model,
+                system_instruction=system_instruction,
             ),
         )
-    )
+        print(f"[Call {call_id[:8]}] Using LLM: Gemini ({gemini_model})")
+    else:
+        groq_model = "qwen/qwen3.8-27b"
+        llm = GroqLLMService(
+            api_key=os.getenv("GROQ_API_KEY"),
+            settings=GroqLLMService.Settings(
+                model=groq_model,
+                system_instruction=system_instruction,
+            ),
+        )
+        print(f"[Call {call_id[:8]}] Using LLM: Groq ({groq_model})")
     tts = DeepgramTTSService(
         api_key=os.getenv("DEEPGRAM_API_KEY"),
-        settings=DeepgramTTSService.Settings(voice="aura-asteria-en")
+        settings=DeepgramTTSService.Settings(voice=voice)
     )
+    print(f"[Call {call_id[:8]}] Using TTS Voice: {voice}")
 
     context            = LLMContext()
     context_aggregator = LLMContextAggregatorPair(
@@ -330,6 +360,9 @@ async def run_bot(connection: SmallWebRTCConnection):
 # HTTP signaling server (WebRTC offer/answer)
 async def handle_offer(request):
     body       = await request.json()
+    voice_key  = str(body.get("voice", "asteria")).strip().lower()
+    selected_voice = VOICE_MAP.get(voice_key, "aura-2-asteria-en")
+
     # Strip .local mDNS ICE candidates — aioice can't resolve them on Windows
     sdp_lines  = body["sdp"].splitlines()
     sdp_clean  = "\r\n".join(
@@ -337,7 +370,7 @@ async def handle_offer(request):
     ) + "\r\n"
     connection = SmallWebRTCConnection()
     await connection.initialize(sdp=sdp_clean, type=body["type"])
-    asyncio.ensure_future(run_bot(connection))
+    asyncio.ensure_future(run_bot(connection, voice=selected_voice))
     answer = connection.get_answer()
     return web.json_response(answer, headers={
         "Access-Control-Allow-Origin": "*",
@@ -357,5 +390,8 @@ app.router.add_post("/offer",   handle_offer)
 app.router.add_route("OPTIONS", "/offer", handle_options)
 
 if __name__ == "__main__":
-    print("[Bot] Starting signaling server on http://localhost:7860")
+    provider = os.getenv("LLM_PROVIDER", "groq").strip().lower()
+    model_info = os.getenv("GEMINI_MODEL", "gemini-3.8-flash") if provider == "gemini" else "qwen/qwen3.8-27b"
+    print(f"[Bot] Starting signaling server on http://localhost:7860")
+    print(f"[Bot] Active LLM Provider: {provider.upper()} ({model_info})")
     web.run_app(app, host="0.0.0.0", port=7860)

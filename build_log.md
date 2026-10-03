@@ -105,6 +105,74 @@ This document tracks the technical challenges, root cause analyses, and solution
 
 ---
 
+### 8. Google Gemini Integration & Model Availability (`LLM_PROVIDER`)
+- **Symptom:**
+  - When configuring Google Gemini as the LLM provider, calls threw:
+    ```text
+    google.genai.errors.ClientError: 404 NOT_FOUND.
+    "This model models/gemini-2.0-flash is no longer available. Please update your code to use models/gemini-3.8-flash for the latest features and improvements."
+    ```
+  - STT transcribed user speech, but the bot stayed silent on each turn, only outputting the initial greeting.
+- **Root Cause:**
+  - `gemini-2.0-flash` was deprecated/sunset by Google in favor of `gemini-3.8-flash`.
+  - Windows Python 3.13 pip encountered TLS handshake resets (`ConnectionResetError 10054`) on `files.pythonhosted.org` when installing `google-genai` due to `truststore` handling; resolved via `--use-deprecated=legacy-certs`.
+- **Solution:**
+  - Implemented dynamic runtime toggle in `bot/bot.py` via `LLM_PROVIDER` (`groq` vs `gemini`) and `GEMINI_MODEL`.
+  - Updated default model to `gemini-3.8-flash`.
+  - Added full fallback structure and startup logging (`[Bot] Active LLM Provider: ...`).
+
+---
+
+### 9. Persistent Browser Microphone Permission Prompt Across Calls
+- **Symptom:** Every time the user switched voices or initiated a subsequent call after clicking "End Call", the browser repeatedly prompted for microphone permissions.
+- **Root Cause:**
+  - Even though `app.js` cached `micStream` globally and disabled tracks on `endCall()`, calling `RTCPeerConnection.close()` automatically stops all attached `MediaStreamTrack` senders under the hood.
+  - When a `MediaStreamTrack` is stopped, its `readyState` permanently transitions to `"ended"` and cannot be revived.
+  - On the next `startCall()`, `getOrCreateMicStream()` detected `readyState !== "live"` and was forced to execute `navigator.mediaDevices.getUserMedia()`, prompting the user anew.
+- **Solution:**
+  - In `frontend/src/app.js`, clone the audio track via `track.clone()` before attaching it to `pc.addTrack(clone, micStream)`.
+  - When `pc.close()` stops the cloned track at the end of a session, the master track in `micStream` remains alive and untouched.
+  - The browser requests microphone permission only once upon initial user action.
+
+---
+
+## LLM Provider Benchmark & Comparative Analysis (Groq vs. Gemini)
+
+To determine the optimal default LLM provider for real-time voice conversations, live calls were executed and benchmarked under identical network conditions and pipeline configurations (Deepgram STT & TTS).
+
+### 1. Empirical Latency Metrics
+
+| Metric | **Groq** (`qwen/qwen3.8-27b`) | **Google Gemini** (`gemini-3.8-flash`) | Variance / Winner |
+|---|---|---|---|
+| **Average LLM Latency** | **682 ms** (~0.68s) | **6,183 ms** (~6.18s) | **Groq (9.1x faster)** |
+| **Median LLM Latency** | **670 ms** | **5,940 ms** | **Groq** |
+| **Minimum Turn Latency** | **354 ms** | **1,481 ms** | **Groq (4.2x faster)** |
+| **Maximum Turn Latency** | **1,198 ms** | **10,837 ms** (~10.8s) | **Groq (9.0x faster)** |
+| **Evaluated Sample** | 25 turns across 3 calls | 10 turns across 2 calls | — |
+| **Average Deepgram TTS Latency** | **~357 ms** | **~359 ms** | Identical |
+| **Total Voice Turnaround (STT+LLM+TTS)** | **~1.3s – 1.5s** | **~6.8s – 11.5s** | **Groq delivers conversational flow** |
+
+### 2. Transcript & Conversational Dynamics
+
+* **Conversational Flow & Dead-Air:**
+  - In conversational voice interfaces, latency exceeding **1,200 ms** introduces perceptible hesitation, and delays past **2,000 ms** cause users to assume the connection dropped.
+  - **Groq:** Responses arrived in ~500–700 ms. The back-and-forth cadence mirrored natural human interaction without dead-air.
+  - **Gemini:** Average response latency of **6.2 seconds** (with peaks up to **10.8 seconds**) created severe conversational friction. Reviewing transcripts revealed that the user frequently said *"Hello?"* or re-prompted due to the long pauses.
+* **Turn Collisions & Cut-Offs:**
+  - Because of Gemini's latency gap, the user often resumed speaking just as Gemini's first audio chunk arrived from TTS, triggering barge-in interruptions that truncated Gemini's answers mid-sentence (e.g. `"...or roughly 56 grams for [cut off]"`).
+* **Adherence to Voice Constraints:**
+  - **Groq (`qwen/qwen3.8-27b`):** Consistently obeyed the voice system instruction (*"Keep responses short — 1-2 sentences max"*), delivering tight, punchy answers (e.g. *"Two plus two is four"*, *"There are seven days in a week"*).
+  - **Gemini (`gemini-3.8-flash`):** Delivered detailed, high-quality reasoning, but tended toward longer prose less suited for rapid audio delivery unless explicitly trimmed.
+
+### 3. Production Recommendation: Default Choice
+
+> **Decision: Groq (`qwen/qwen3.8-27b`) remains the default provider (`LLM_PROVIDER=groq`).**
+
+- **Why Groq:** Sub-700ms Time-To-First-Token (TTFT) is critical for voice agents. Groq's LPU inference enables real-time duplex speech without jarring latency.
+- **Role of Gemini:** Gemini is retained as an opt-in toggle (`LLM_PROVIDER=gemini`) for tasks demanding complex multi-step reasoning where latency can be traded for knowledge depth. For voice agents to match Groq-level speeds with Gemini, the direct bidirectional WebSocket protocol (**Gemini Live Multimodal API**) should be utilized rather than standard REST/HTTP chat completions.
+
+---
+
 ## Verification & Current System Status
 
 In the latest verified call (Call `6c028284-aed9-4e78-9096-054c11b8f5f0`):
@@ -114,3 +182,4 @@ In the latest verified call (Call `6c028284-aed9-4e78-9096-054c11b8f5f0`):
 - **Avg TTS Latency:** ~345 ms
 - **Persistence:** Successfully written to Cloudflare D1 across `calls`, `transcripts`, and `call_metrics` tables.
 - **Worker Response:** `HTTP 201 Created`
+

@@ -13,11 +13,30 @@ function setStatus(msg, type = "") {
     el.className = type;
 }
 
+// Microphone stream manager (cached to prevent repeated browser permission prompts)
+async function getOrCreateMicStream() {
+    const isLive = micStream && micStream.active && micStream.getAudioTracks().some(t => t.readyState === "live");
+    if (!isLive) {
+        setStatus("Requesting microphone...");
+        micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+            }
+        });
+    }
+    // Ensure tracks are active
+    micStream.getAudioTracks().forEach(track => {
+        track.enabled = true;
+    });
+    return micStream;
+}
+
 // Start call 
 async function startCall() {
     try {
-        setStatus("Requesting microphone...");
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        await getOrCreateMicStream();
 
         pc = new RTCPeerConnection();
 
@@ -43,8 +62,10 @@ async function startCall() {
         };
 
         // Send mic audio to bot & receive audio back
+        // Clone mic tracks before adding to PeerConnection so pc.close() doesn't kill the cached master tracks
         micStream.getAudioTracks().forEach(track => {
-            pc.addTrack(track, micStream);
+            const clone = track.clone();
+            pc.addTrack(clone, micStream);
         });
 
         // Play bot audio back
@@ -73,10 +94,18 @@ async function startCall() {
 
         setStatus("Connecting to bot...");
 
+        const voice = document.getElementById("voiceSelect")?.value || "asteria";
+        const voiceSelect = document.getElementById("voiceSelect");
+        if (voiceSelect) voiceSelect.disabled = true;
+
         const res = await fetch(`${BOT_URL}/offer`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(pc.localDescription),
+            body: JSON.stringify({
+                sdp: pc.localDescription.sdp,
+                type: pc.localDescription.type,
+                voice: voice,
+            }),
         });
 
         if (!res.ok) {
@@ -108,16 +137,25 @@ function endCall() {
         dc = null;
     }
     if (micStream) {
-        micStream.getTracks().forEach(track => track.stop());
-        micStream = null;
+        // Mute mic tracks instead of destroying them to avoid re-prompting for permission
+        micStream.getAudioTracks().forEach(track => track.enabled = false);
     }
     if (pc) {
-        try { pc.close(); } catch (e) {}
+        try {
+            pc.getSenders().forEach(sender => {
+                if (sender.track) {
+                    try { sender.track.stop(); } catch (e) {}
+                }
+            });
+            pc.close();
+        } catch (e) {}
         pc = null;
     }
     setStatus("Call ended. Saving...");
     document.getElementById("startBtn").disabled = false;
     document.getElementById("endBtn").style.display = "none";
+    const voiceSelect = document.getElementById("voiceSelect");
+    if (voiceSelect) voiceSelect.disabled = false;
 
     // Refresh call list after a short delay (bot needs time to POST to worker)
     setTimeout(loadCalls, 1200);
@@ -204,6 +242,14 @@ function avg(arr, key) {
     if (!vals.length) return "—";
     return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
 }
+
+// Clean up microphone hardware tracks when tab is closed
+window.addEventListener("beforeunload", () => {
+    if (micStream) {
+        micStream.getTracks().forEach(track => track.stop());
+        micStream = null;
+    }
+});
 
 // Load calls on page open
 loadCalls();

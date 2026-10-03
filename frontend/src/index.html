@@ -59,6 +59,42 @@
             font-size: 0.9rem;
         }
 
+        .voice-selector-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 22px;
+        }
+
+        .voice-selector-wrap label {
+            font-size: 0.85rem;
+            color: #888;
+            font-weight: 500;
+        }
+
+        #voiceSelect {
+            background: #1a1a1a;
+            color: #f0f0f0;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 0.88rem;
+            font-weight: 500;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        #voiceSelect:hover, #voiceSelect:focus {
+            border-color: #6366f1;
+        }
+
+        #voiceSelect:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         #status {
             font-size: 0.85rem;
             margin-top: 14px;
@@ -272,6 +308,14 @@
         <!-- Call controls -->
         <div class="call-box">
             <p>Click to start a voice call with the AI agent.</p>
+            <div class="voice-selector-wrap">
+                <label for="voiceSelect">Voice:</label>
+                <select id="voiceSelect">
+                    <option value="asteria" selected>asteria</option>
+                    <option value="athena">athena</option>
+                    <option value="mars">mars</option>
+                </select>
+            </div>
             <button id="startBtn" onclick="startCall()">Start Call</button>
             <button id="endBtn" onclick="endCall()">End Call</button>
             <div id="status">Idle</div>
