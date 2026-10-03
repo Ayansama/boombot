@@ -4,8 +4,28 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>boombot</title>
+    <title>boombot — Mini Call Log Service</title>
+
+    <!-- Google Fonts: Inter & Roboto Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,600;0,800;1,800;1,900&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet">
+
     <style>
+        :root {
+            --bg-page: #FAFAF8;
+            --surface: #FFFFFF;
+            --ink-primary: #101010;
+            --ink-black: #000000;
+            --text-secondary: #656565;
+            --border-muted: #B7B7B1;
+            --surface-disabled: #EAEAE5;
+            --accent-active: #C5F4AC;
+            --modal-backdrop: rgba(16, 16, 16, 0.44);
+            --shadow-action: 5px 5px 0px #101010;
+            --shadow-modal: 10px 10px 0px #101010;
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -13,333 +33,1215 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #0f0f0f;
-            color: #f0f0f0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-page);
+            color: var(--ink-primary);
             min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            -webkit-font-smoothing: antialiased;
         }
 
-        header {
-            padding: 20px 32px;
-            border-bottom: 1px solid #222;
+        /* Desktop Surface 1440px Canvas */
+        .desktop-canvas {
+            width: 100%;
+            max-width: 1440px;
+            min-height: 960px;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-page);
+            position: relative;
+        }
+
+        /* ----------------------------------------------------
+           1. Header (96px high, 40px horizontal padding)
+        ---------------------------------------------------- */
+        header.app-header {
+            height: 96px;
+            min-height: 96px;
+            padding: 0 40px;
+            border-bottom: 1px solid var(--ink-primary);
             display: flex;
             align-items: center;
-            gap: 12px;
+            justify-content: space-between;
         }
 
-        header h1 {
-            font-size: 1.2rem;
+        .header-brand-group {
+            display: flex;
+            align-items: center;
+        }
+
+        .brand-logo {
+            font-family: 'Inter', sans-serif;
+            font-weight: 900;
+            font-style: italic;
+            font-size: 39px;
+            letter-spacing: -2px;
+            color: var(--ink-primary);
+            line-height: 1;
+        }
+
+        .brand-divider {
+            width: 1px;
+            height: 28px;
+            background: var(--border-muted);
+            margin: 0 20px;
+        }
+
+        .brand-subtitle {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .header-nav-group {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+
+        .nav-item-active {
+            font-family: 'Roboto Mono', monospace;
             font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--ink-primary);
+            text-decoration: underline;
+            text-underline-offset: 4px;
+            letter-spacing: 0.5px;
         }
 
-        header span {
-            font-size: 0.8rem;
-            color: #666;
+        .nav-item-secondary {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
         }
 
-        .container {
-            max-width: 860px;
-            margin: 0 auto;
-            padding: 32px;
-        }
-
-        /* Call button */
-        .call-box {
-            background: #161616;
-            border: 1px solid #2a2a2a;
-            border-radius: 12px;
-            padding: 32px;
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        .call-box p {
-            color: #888;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
-        }
-
-        .voice-selector-wrap {
+        .header-icon-box {
+            width: 36px;
+            height: 36px;
+            background: var(--ink-primary);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            margin-bottom: 22px;
+            gap: 3px;
         }
 
-        .voice-selector-wrap label {
-            font-size: 0.85rem;
-            color: #888;
-            font-weight: 500;
+        .header-icon-bar {
+            width: 3px;
+            background: #FFFFFF;
+            border-radius: 0;
+        }
+        .header-icon-bar:nth-child(1) { height: 12px; }
+        .header-icon-bar:nth-child(2) { height: 20px; }
+        .header-icon-bar:nth-child(3) { height: 16px; }
+        .header-icon-bar:nth-child(4) { height: 22px; }
+        .header-icon-bar:nth-child(5) { height: 14px; }
+
+        /* ----------------------------------------------------
+           2. Main Workspace (800px base height, 800px / 640px split)
+        ---------------------------------------------------- */
+        .main-workspace {
+            display: flex;
+            flex: 1;
+            min-height: 800px;
         }
 
-        #voiceSelect {
-            background: #1a1a1a;
-            color: #f0f0f0;
-            border: 1px solid #333;
-            border-radius: 6px;
-            padding: 6px 12px;
-            font-size: 0.88rem;
-            font-weight: 500;
-            outline: none;
-            cursor: pointer;
-            transition: border-color 0.2s;
+        /* Left Call Panel (800px wide, 40px padding) */
+        .call-panel {
+            width: 800px;
+            padding: 40px;
+            border-right: 1px solid var(--ink-primary);
+            display: flex;
+            flex-direction: column;
+            position: relative;
         }
 
-        #voiceSelect:hover, #voiceSelect:focus {
-            border-color: #6366f1;
+        .panel-top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
         }
 
-        #voiceSelect:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .utility-label {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--ink-primary);
         }
 
-        #status {
-            font-size: 0.85rem;
-            margin-top: 14px;
-            color: #666;
-            min-height: 20px;
+        .utility-label.secondary {
+            color: var(--text-secondary);
         }
 
-        #status.active {
-            color: #4ade80;
+        /* Status Badge (28px high, 12px padding, 8px gap) */
+        .status-badge {
+            height: 28px;
+            padding: 0 12px;
+            border: 1px solid var(--ink-primary);
+            background: var(--surface);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--ink-primary);
+            border-radius: 0;
         }
 
-        #status.error {
-            color: #f87171;
+        .status-badge.active {
+            background: var(--accent-active);
         }
 
-        button {
-            padding: 12px 28px;
-            border-radius: 8px;
-            border: none;
-            font-size: 0.95rem;
+        .status-badge.error {
+            background: #FFFFFF;
+            color: #d32f2f;
+            border-color: #d32f2f;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            background: var(--ink-primary);
+            display: inline-block;
+        }
+        .status-badge.active .status-dot {
+            background: var(--ink-primary);
+        }
+
+        /* Headline: 86px / 94% / -5px letter spacing */
+        .main-headline {
+            font-family: 'Inter', sans-serif;
+            font-weight: 900;
+            font-style: italic;
+            font-size: 86px;
+            line-height: 94%;
+            letter-spacing: -5px;
+            text-transform: uppercase;
+            color: var(--ink-primary);
+            margin-bottom: 24px;
+        }
+
+        .headline-line {
+            display: block;
+        }
+
+        .headline-outline {
+            color: var(--bg-page);
+            -webkit-text-stroke: 1.3px var(--ink-primary);
+        }
+
+        /* Instructions */
+        .instructions-text {
+            font-family: 'Inter', sans-serif;
+            font-weight: 400;
+            font-size: 16px;
+            line-height: 150%;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+
+        /* Voice Options (232 × 54px, 18px padding, 12px gap) */
+        .voice-section {
+            margin-bottom: 32px;
+        }
+
+        .voice-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .voice-grid {
+            display: flex;
+            gap: 12px;
+        }
+
+        .voice-card {
+            width: 232px;
+            height: 54px;
+            padding: 0 18px;
+            border: 1px solid var(--ink-primary);
+            border-radius: 0;
+            background: var(--surface);
+            color: var(--ink-primary);
+            font-family: 'Inter', sans-serif;
             font-weight: 600;
+            font-size: 16px;
             cursor: pointer;
-            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            outline: none;
+            transition: none;
         }
 
-        button:hover {
-            opacity: 0.85;
+        .voice-card:hover {
+            background: #f4f4f0;
         }
 
-        button:disabled {
-            opacity: 0.4;
+        .voice-card.selected {
+            background: var(--ink-primary);
+            color: #FFFFFF;
+            border-color: var(--ink-primary);
+        }
+
+        .voice-card.locked {
+            background: var(--surface-disabled) !important;
+            border-color: var(--border-muted) !important;
+            color: var(--ink-primary) !important;
             cursor: not-allowed;
+            opacity: 0.9;
+        }
+
+        .voice-indicator {
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        /* Action Buttons: 304 × 64px, 24px padding, 5px shadow */
+        .action-row {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+            margin-bottom: 40px;
+        }
+
+        .btn-call {
+            width: 304px;
+            height: 64px;
+            padding: 0 24px;
+            border-radius: 0;
+            font-family: 'Inter', sans-serif;
+            font-weight: 400;
+            font-size: 16px;
+            cursor: pointer;
+            outline: none;
+            box-shadow: var(--shadow-action);
+            display: inline-flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: transform 0.05s, box-shadow 0.05s;
+        }
+
+        .btn-call:active {
+            transform: translate(2px, 2px);
+            box-shadow: 3px 3px 0px var(--ink-primary);
         }
 
         #startBtn {
-            background: #6366f1;
-            color: #fff;
+            background: var(--ink-primary);
+            color: #FFFFFF;
+            border: 1px solid var(--ink-primary);
+            justify-content: center;
         }
 
         #endBtn {
-            background: #ef4444;
-            color: #fff;
+            background: var(--surface);
+            color: var(--ink-primary);
+            border: 1px solid var(--ink-primary);
             display: none;
-            margin-left: 10px;
         }
 
-        /* Call list */
-        h2 {
-            font-size: 1rem;
+        .voice-context-note {
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .voice-context-note.visible {
+            display: flex;
+        }
+
+        .voice-context-title {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .voice-context-val {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 14px;
+            color: var(--ink-primary);
+        }
+
+        /* Lower Region / Active In-Call Section */
+        .panel-lower-section {
+            margin-top: auto;
+            padding-top: 24px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            min-height: 90px;
+        }
+
+        .call-progress-info {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .call-progress-info.visible {
+            display: flex;
+        }
+
+        .call-progress-title {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--ink-primary);
+        }
+
+        .call-progress-helper {
+            font-family: 'Inter', sans-serif;
+            font-weight: 400;
+            font-size: 13px;
+            line-height: 150%;
+            color: var(--text-secondary);
+        }
+
+        /* Audio Visualization (244 × 60px region, 4px bar gaps) */
+        .audio-wave-region {
+            width: 244px;
+            height: 60px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .audio-wave-region.visible {
+            display: flex;
+        }
+
+        .audio-wave-bar {
+            width: 3px;
+            background: var(--ink-primary);
+            border-radius: 0;
+            height: 12px;
+            transition: height 0.1s ease;
+        }
+
+        /* Dynamic wave animation when active */
+        .audio-wave-region.animating .audio-wave-bar {
+            animation: wavePulse 1.1s ease-in-out infinite alternate;
+        }
+
+        @keyframes wavePulse {
+            0% { height: 6px; }
+            50% { height: 48px; }
+            100% { height: 14px; }
+        }
+
+        /* Staggered animation delays */
+        .audio-wave-bar:nth-child(1)  { animation-delay: 0.1s; }
+        .audio-wave-bar:nth-child(2)  { animation-delay: 0.3s; }
+        .audio-wave-bar:nth-child(3)  { animation-delay: 0.05s; }
+        .audio-wave-bar:nth-child(4)  { animation-delay: 0.4s; }
+        .audio-wave-bar:nth-child(5)  { animation-delay: 0.15s; }
+        .audio-wave-bar:nth-child(6)  { animation-delay: 0.5s; }
+        .audio-wave-bar:nth-child(7)  { animation-delay: 0.25s; }
+        .audio-wave-bar:nth-child(8)  { animation-delay: 0.6s; }
+        .audio-wave-bar:nth-child(9)  { animation-delay: 0.2s; }
+        .audio-wave-bar:nth-child(10) { animation-delay: 0.45s; }
+        .audio-wave-bar:nth-child(11) { animation-delay: 0.1s; }
+        .audio-wave-bar:nth-child(12) { animation-delay: 0.55s; }
+        .audio-wave-bar:nth-child(13) { animation-delay: 0.35s; }
+        .audio-wave-bar:nth-child(14) { animation-delay: 0.15s; }
+        .audio-wave-bar:nth-child(15) { animation-delay: 0.6s; }
+        .audio-wave-bar:nth-child(16) { animation-delay: 0.3s; }
+        .audio-wave-bar:nth-child(17) { animation-delay: 0.05s; }
+        .audio-wave-bar:nth-child(18) { animation-delay: 0.4s; }
+        .audio-wave-bar:nth-child(19) { animation-delay: 0.2s; }
+        .audio-wave-bar:nth-child(20) { animation-delay: 0.5s; }
+        .audio-wave-bar:nth-child(21) { animation-delay: 0.1s; }
+        .audio-wave-bar:nth-child(22) { animation-delay: 0.35s; }
+        .audio-wave-bar:nth-child(23) { animation-delay: 0.15s; }
+        .audio-wave-bar:nth-child(24) { animation-delay: 0.45s; }
+        .audio-wave-bar:nth-child(25) { animation-delay: 0.25s; }
+        .audio-wave-bar:nth-child(26) { animation-delay: 0.5s; }
+        .audio-wave-bar:nth-child(27) { animation-delay: 0.2s; }
+        .audio-wave-bar:nth-child(28) { animation-delay: 0.4s; }
+
+        /* Error Notification Banner */
+        .error-banner {
+            display: none;
+            position: absolute;
+            bottom: 24px;
+            left: 40px;
+            right: 40px;
+            padding: 14px 20px;
+            background: var(--surface);
+            border: 1px solid var(--ink-primary);
+            box-shadow: var(--shadow-action);
+            align-items: center;
+            gap: 16px;
+            z-index: 50;
+        }
+
+        .error-banner.visible {
+            display: flex;
+        }
+
+        .error-banner-icon {
+            font-size: 16px;
+        }
+
+        .error-banner-label {
+            font-family: 'Roboto Mono', monospace;
             font-weight: 600;
-            margin-bottom: 16px;
-            color: #aaa;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--ink-primary);
         }
 
-        .call-list {
+        .error-banner-text {
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            color: var(--ink-primary);
+        }
+
+        /* ----------------------------------------------------
+           3. Right History Panel (640px wide, 40px padding)
+        ---------------------------------------------------- */
+        .history-panel {
+            width: 640px;
+            padding: 40px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
         }
 
-        .call-item {
-            background: #161616;
-            border: 1px solid #2a2a2a;
-            border-radius: 10px;
-            padding: 16px 20px;
+        .history-header-row {
             display: flex;
+            align-items: flex-start;
             justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .recent-calls-heading {
+            font-family: 'Inter', sans-serif;
+            font-weight: 900;
+            font-style: italic;
+            font-size: 44px;
+            line-height: 100%;
+            letter-spacing: -2px;
+            text-transform: uppercase;
+            color: var(--ink-black);
+        }
+
+        /* Circular Record Count Badge (48 × 48px, 1px border) */
+        .record-count-circle {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 1px solid var(--ink-primary);
+            display: flex;
             align-items: center;
+            justify-content: center;
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 16px;
+            color: var(--ink-primary);
+            background: var(--bg-page);
+            flex-shrink: 0;
+        }
+
+        .history-subhead {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Call List */
+        .call-list-container {
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            max-height: 580px;
+            padding-right: 4px;
+        }
+
+        /* Call Item: 1px top divider, 26px vertical padding, 16px internal gap */
+        .call-record-item {
+            border-top: 1px solid var(--ink-primary);
+            padding: 26px 0;
             cursor: pointer;
-            transition: border-color 0.2s;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            transition: background 0.1s;
         }
 
-        .call-item:hover {
-            border-color: #6366f1;
+        .call-record-item:hover {
+            background: rgba(16, 16, 16, 0.02);
         }
 
-        .call-item .meta {
-            font-size: 0.82rem;
-            color: #666;
-            margin-top: 4px;
+        .call-record-row-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
-        .call-item .badge {
-            background: #1e1e2e;
-            color: #818cf8;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 0.78rem;
+        .call-identifier {
+            font-family: 'Inter', sans-serif;
+            font-weight: 400;
+            font-size: 24px;
+            letter-spacing: -0.7px;
+            color: var(--ink-primary);
         }
 
-        .empty {
-            color: #555;
-            font-size: 0.9rem;
+        .call-arrow-icon {
+            width: 24px;
+            height: 24px;
+            stroke: var(--ink-primary);
+            stroke-width: 1.5;
+            fill: none;
+            transition: transform 0.15s;
+        }
+
+        .call-record-item:hover .call-arrow-icon {
+            transform: translate(2px, -2px);
+        }
+
+        .call-record-row-bottom {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .call-record-timestamp {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* Duration Badge (25px high, 10px padding, 1px border) */
+        .duration-badge {
+            height: 25px;
+            padding: 0 10px;
+            border: 1px solid var(--ink-primary);
+            border-radius: 0;
+            background: var(--bg-page);
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 12px;
+            color: var(--ink-primary);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .history-footer-label {
+            border-top: 1px solid var(--ink-primary);
+            padding-top: 18px;
+            margin-top: auto;
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+        }
+
+        .empty-history {
+            border-top: 1px solid var(--ink-primary);
+            padding: 48px 0;
             text-align: center;
-            padding: 40px;
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            color: var(--text-secondary);
         }
 
-        /* Modal */
+        /* ----------------------------------------------------
+           4. Footer (64px high, 40px horizontal padding)
+        ---------------------------------------------------- */
+        footer.app-footer {
+            height: 64px;
+            min-height: 64px;
+            padding: 0 40px;
+            border-top: 1px solid var(--ink-primary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .footer-signature {
+            font-family: 'Inter', sans-serif;
+            font-weight: 800;
+            font-style: italic;
+            font-size: 14px;
+            text-transform: uppercase;
+            color: var(--ink-primary);
+        }
+
+        .footer-meta {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+        }
+
+        /* ----------------------------------------------------
+           5. Modal Styling (1080 × 652px, 10px hard shadow)
+        ---------------------------------------------------- */
         .modal-overlay {
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 100;
+            background: var(--modal-backdrop);
+            z-index: 1000;
             align-items: center;
             justify-content: center;
+            padding: 20px;
         }
 
         .modal-overlay.open {
             display: flex;
         }
 
-        .modal {
-            background: #161616;
-            border: 1px solid #2a2a2a;
-            border-radius: 14px;
-            padding: 28px;
-            width: 90%;
-            max-width: 640px;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
+        .modal-surface {
+            width: 1080px;
+            max-width: 95vw;
+            height: 652px;
+            max-height: 90vh;
+            background: var(--surface);
+            border: 1px solid var(--ink-primary);
+            border-radius: 0;
+            box-shadow: var(--shadow-modal);
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Modal Header (104px high, 32px padding) */
+        .modal-header {
+            height: 104px;
+            min-height: 104px;
+            padding: 0 32px;
+            border-bottom: 1px solid var(--ink-primary);
+            display: flex;
             align-items: center;
-            margin-bottom: 20px;
+            justify-content: space-between;
         }
 
-        .modal-header h3 {
-            font-size: 1rem;
-        }
-
-        .close-btn {
-            background: #2a2a2a;
-            color: #aaa;
-            padding: 6px 12px;
-            font-size: 0.8rem;
-        }
-
-        .section-label {
-            font-size: 0.75rem;
-            color: #555;
+        .modal-title {
+            font-family: 'Inter', sans-serif;
+            font-weight: 900;
+            font-style: italic;
+            font-size: 44px;
+            letter-spacing: -2px;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
-            margin: 18px 0 10px;
+            color: var(--ink-primary);
         }
 
-        .transcript-turn {
-            padding: 10px 14px;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            font-size: 0.88rem;
-            line-height: 1.5;
+        /* Dismiss control (40 × 40px, 20px icon) */
+        .modal-dismiss-btn {
+            width: 40px;
+            height: 40px;
+            border: 1px solid var(--ink-primary);
+            border-radius: 0;
+            background: var(--surface);
+            color: var(--ink-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            outline: none;
         }
 
-        .transcript-turn.user {
-            background: #1e1e2e;
-            border-left: 3px solid #6366f1;
+        .modal-dismiss-btn:hover {
+            background: #f4f4f0;
         }
 
-        .transcript-turn.bot {
-            background: #1a1f1a;
-            border-left: 3px solid #4ade80;
+        /* Metadata Strip (88px high, 32px padding, bottom divider) */
+        .modal-meta-strip {
+            height: 88px;
+            min-height: 88px;
+            padding: 0 32px;
+            border-bottom: 1px solid var(--ink-primary);
+            display: flex;
+            align-items: center;
         }
 
-        .turn-role {
-            font-size: 0.72rem;
-            color: #666;
-            margin-bottom: 4px;
+        .meta-strip-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
 
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
+        .meta-strip-col.col-duration {
+            flex: 0 0 140px;
+            text-align: right;
+            align-items: flex-end;
+        }
+
+        .modal-field-label {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+        }
+
+        .modal-field-val {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 14px;
+            color: var(--ink-primary);
+        }
+
+        .modal-field-val.duration-val {
+            font-size: 14px;
+        }
+
+        /* Content Area (356px high, split horizontally) */
+        .modal-content-split {
+            height: 356px;
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Transcript Panel (700px wide, 32px padding, 12px gap) */
+        .modal-transcript-panel {
+            width: 700px;
+            flex: 7;
+            padding: 32px;
+            border-right: 1px solid var(--ink-primary);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-heading-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .modal-section-heading {
+            font-family: 'Inter', sans-serif;
+            font-weight: 400;
+            font-size: 22px;
+            color: var(--ink-primary);
+        }
+
+        .turn-count-badge {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+        }
+
+        .transcript-turns-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Transcript Turns (636 × 74px min, 12px vertical / 20px horizontal padding, 1px muted border) */
+        .transcript-turn-box {
+            min-height: 74px;
+            padding: 12px 20px;
+            border: 1px solid var(--border-muted);
+            border-radius: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .transcript-turn-box.bot {
+            background: var(--surface);
+        }
+
+        .transcript-turn-box.user {
+            background: var(--bg-page);
+        }
+
+        .turn-speaker-label {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--ink-primary);
+            letter-spacing: 0.5px;
+        }
+
+        .turn-content-text {
+            font-family: 'Inter', sans-serif;
+            font-weight: 400;
+            font-size: 15px;
+            line-height: 150%;
+            color: var(--ink-primary);
+        }
+
+        /* Metrics Panel (380px wide, 32px padding, 16px gap, off-white background) */
+        .modal-metrics-panel {
+            width: 380px;
+            flex: 3.8;
+            padding: 32px;
+            background: var(--bg-page);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metrics-rows-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-top: 24px;
+        }
+
+        .metric-row-item {
+            width: 316px;
+            max-width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .metric-row-label {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+        }
+
+        .metric-row-val {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 16px;
+            color: var(--ink-primary);
+        }
+
+        /* Action Footer (104px high, 32px horizontal padding, top divider) */
+        .modal-action-footer {
+            height: 104px;
+            min-height: 104px;
+            padding: 0 32px;
+            border-top: 1px solid var(--ink-primary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--surface);
+        }
+
+        .footer-utility-text {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+        }
+
+        .modal-close-btn {
+            width: 148px;
+            height: 64px;
+            background: var(--ink-primary);
+            color: #FFFFFF;
+            border: 1px solid var(--ink-primary);
+            border-radius: 0;
+            font-family: 'Inter', sans-serif;
+            font-weight: 400;
+            font-size: 16px;
+            cursor: pointer;
+            outline: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             gap: 10px;
         }
 
-        .metric-box {
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
-            border-radius: 8px;
-            padding: 12px;
-            text-align: center;
-        }
-
-        .metric-box .val {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: #818cf8;
-        }
-
-        .metric-box .lbl {
-            font-size: 0.72rem;
-            color: #666;
-            margin-top: 4px;
+        .modal-close-btn:hover {
+            opacity: 0.92;
         }
     </style>
 </head>
 
 <body>
 
-    <header>
-        <h1>boombot</h1>
-        <span>Mini Call Log Service</span>
-    </header>
+    <div class="desktop-canvas">
 
-    <div class="container">
-
-        <!-- Call controls -->
-        <div class="call-box">
-            <p>Click to start a voice call with the AI agent.</p>
-            <div class="voice-selector-wrap">
-                <label for="voiceSelect">Voice:</label>
-                <select id="voiceSelect">
-                    <option value="asteria" selected>asteria</option>
-                    <option value="athena">athena</option>
-                    <option value="mars">mars</option>
-                </select>
+        <!-- 1. Header (96px) -->
+        <header class="app-header">
+            <div class="header-brand-group">
+                <span class="brand-logo">boombot</span>
+                <span class="brand-divider"></span>
+                <span class="brand-subtitle">Mini Call Log Service</span>
             </div>
-            <button id="startBtn" onclick="startCall()">Start Call</button>
-            <button id="endBtn" onclick="endCall()">End Call</button>
-            <div id="status">Idle</div>
-        </div>
+            <div class="header-nav-group">
+                <span class="nav-item-active">VOICE CALLS</span>
+                <span class="nav-item-secondary">YOU × AI</span>
+                <div class="header-icon-box" title="Audio Activity">
+                    <span class="header-icon-bar"></span>
+                    <span class="header-icon-bar"></span>
+                    <span class="header-icon-bar"></span>
+                    <span class="header-icon-bar"></span>
+                    <span class="header-icon-bar"></span>
+                </div>
+            </div>
+        </header>
 
-        <!-- Call list -->
-        <h2>Recent Calls</h2>
-        <div class="call-list" id="callList">
-            <div class="empty">No calls yet.</div>
-        </div>
+        <!-- 2. Main Workspace (800px min-height) -->
+        <main class="main-workspace">
+
+            <!-- Left Call Panel (800px) -->
+            <section class="call-panel">
+                <div class="panel-top-bar">
+                    <span class="utility-label secondary">VOICE CALL / AI AGENT</span>
+                    <div id="statusBadge" class="status-badge">
+                        <span class="status-dot"></span>
+                        <span id="statusBadgeText">Ready</span>
+                    </div>
+                </div>
+
+                <!-- Main Headline (86px / 94% / -5px letter spacing) -->
+                <h1 class="main-headline" id="mainHeadline">
+                    <span class="headline-line" id="hlLine1">LESS TALK.</span>
+                    <span class="headline-line" id="hlLine2">MORE WORK.</span>
+                    <span class="headline-line headline-outline" id="hlLine3">WITH AI.</span>
+                </h1>
+
+                <!-- Instructions -->
+                <p class="instructions-text" id="instructionsText">
+                    Click to start a voice call with the AI agent.
+                </p>
+
+                <!-- Voice Selection Section -->
+                <div class="voice-section">
+                    <div class="voice-section-header">
+                        <span class="utility-label">SELECT A VOICE</span>
+                        <span class="utility-label secondary" id="voiceLockNotice" style="display: none;">LOCKED DURING CALL</span>
+                    </div>
+                    <div class="voice-grid">
+                        <button type="button" class="voice-card selected" data-voice="asteria" onclick="selectVoice('asteria')">
+                            <span>asteria</span>
+                            <span class="voice-indicator" id="indicator-asteria">✓</span>
+                        </button>
+                        <button type="button" class="voice-card" data-voice="athena" onclick="selectVoice('athena')">
+                            <span>athena</span>
+                            <span class="voice-indicator" id="indicator-athena"></span>
+                        </button>
+                        <button type="button" class="voice-card" data-voice="mars" onclick="selectVoice('mars')">
+                            <span>mars</span>
+                            <span class="voice-indicator" id="indicator-mars"></span>
+                        </button>
+                    </div>
+                    <!-- Hidden select for compatibility -->
+                    <select id="voiceSelect" style="display: none;">
+                        <option value="asteria" selected>asteria</option>
+                        <option value="athena">athena</option>
+                        <option value="mars">mars</option>
+                    </select>
+                </div>
+
+                <!-- Action Controls: Start Call / End Call -->
+                <div class="action-row">
+                    <button type="button" class="btn-call" id="startBtn" onclick="startCall()">
+                        Start Call
+                    </button>
+                    <button type="button" class="btn-call" id="endBtn" onclick="endCall()">
+                        <span>End Call</span>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-6-6 19.8 19.8 0 0 1-3.12-8.68A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />
+                            <line x1="23" y1="1" x2="1" y2="23" />
+                        </svg>
+                    </button>
+
+                    <div class="voice-context-note" id="voiceContextNote">
+                        <span class="voice-context-title">SELECTED VOICE</span>
+                        <span class="voice-context-val" id="voiceContextVal">asteria · voice locked</span>
+                    </div>
+                </div>
+
+                <!-- Lower Region: Call In Progress & Audio Equalizer -->
+                <div class="panel-lower-section">
+                    <div class="call-progress-info" id="callProgressInfo">
+                        <span class="call-progress-title">CALL IN PROGRESS</span>
+                        <span class="call-progress-helper">Use End Call to finish the conversation.</span>
+                    </div>
+
+                    <div class="audio-wave-region" id="audioWaveRegion">
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                        <span class="audio-wave-bar"></span>
+                    </div>
+                </div>
+
+                <!-- Error Toast Banner -->
+                <div class="error-banner" id="errorBanner">
+                    <span class="error-banner-icon">⚠</span>
+                    <span class="error-banner-label">ERROR / STATE</span>
+                    <span class="error-banner-text" id="errorBannerText">Unable to start the call. Please try again.</span>
+                </div>
+
+                <div id="status" style="display: none;">Idle</div>
+            </section>
+
+            <!-- Right History Panel (640px) -->
+            <section class="history-panel">
+                <div class="history-header-row">
+                    <h2 class="recent-calls-heading">RECENT<br>CALLS.</h2>
+                    <div class="record-count-circle" id="recordCount">00</div>
+                </div>
+
+                <div class="history-subhead">SELECT A CALL TO VIEW ITS DETAILS</div>
+
+                <div class="call-list-container" id="callList">
+                    <div class="empty-history">No calls recorded yet.</div>
+                </div>
+
+                <div class="history-footer-label">CALL LOG / NEWEST FIRST</div>
+            </section>
+
+        </main>
+
+        <!-- 3. Footer (64px) -->
+        <footer class="app-footer">
+            <span class="footer-signature">VOICE IN. WORDS OUT.</span>
+            <span class="footer-meta">BOOMBOT / MINI CALL LOG SERVICE</span>
+        </footer>
 
     </div>
 
-    <!-- Detail modal -->
-    <div class="modal-overlay" id="modal">
-        <div class="modal">
+    <!-- 4. Call Detail Modal (1080 × 652px) -->
+    <div class="modal-overlay" id="modal" onclick="onModalBackdropClick(event)">
+        <div class="modal-surface" onclick="event.stopPropagation()">
+
+            <!-- Modal Header (104px) -->
             <div class="modal-header">
-                <h3 id="modalTitle">Call Detail</h3>
-                <button class="close-btn" onclick="closeModal()">Close</button>
+                <h3 class="modal-title">CALL DETAIL.</h3>
+                <button type="button" class="modal-dismiss-btn" onclick="closeModal()" title="Close">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
             </div>
-            <div id="modalBody"></div>
+
+            <!-- Metadata Strip (88px) -->
+            <div class="modal-meta-strip">
+                <div class="meta-strip-col">
+                    <span class="modal-field-label">CALL ID</span>
+                    <span class="modal-field-val" id="modalCallId">—</span>
+                </div>
+                <div class="meta-strip-col">
+                    <span class="modal-field-label">TIMESTAMP</span>
+                    <span class="modal-field-val" id="modalTimestamp">—</span>
+                </div>
+                <div class="meta-strip-col col-duration">
+                    <span class="modal-field-label">DURATION</span>
+                    <span class="modal-field-val duration-val" id="modalDuration">—</span>
+                </div>
+            </div>
+
+            <!-- Content Split (356px) -->
+            <div class="modal-content-split">
+
+                <!-- Left Transcript Panel (700px) -->
+                <div class="modal-transcript-panel">
+                    <div class="panel-heading-row">
+                        <span class="modal-section-heading">Transcript</span>
+                        <span class="turn-count-badge" id="modalTurnCount">0 TURNS</span>
+                    </div>
+
+                    <div class="transcript-turns-wrapper" id="modalTranscriptList">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Right Metrics Panel (380px) -->
+                <div class="modal-metrics-panel">
+                    <span class="modal-section-heading">Metrics</span>
+
+                    <div class="metrics-rows-list">
+                        <div class="metric-row-item">
+                            <span class="metric-row-label">DURATION</span>
+                            <span class="metric-row-val" id="metricDurationVal">—</span>
+                        </div>
+                        <div class="metric-row-item">
+                            <span class="metric-row-label">AVG LLM LATENCY</span>
+                            <span class="metric-row-val" id="metricLlmVal">—</span>
+                        </div>
+                        <div class="metric-row-item">
+                            <span class="metric-row-label">AVG TTS LATENCY</span>
+                            <span class="metric-row-val" id="metricTtsVal">—</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Action Footer (104px) -->
+            <div class="modal-action-footer">
+                <span class="footer-utility-text">TRANSCRIPT & METRICS / SUPPLIED</span>
+                <button type="button" class="modal-close-btn" onclick="closeModal()">
+                    <span>Close</span>
+                    <span>✕</span>
+                </button>
+            </div>
+
         </div>
     </div>
 
+    <!-- Hidden audio element for remote WebRTC stream -->
     <audio id="remoteAudio" autoplay></audio>
 
     <script src="app.js"></script>
