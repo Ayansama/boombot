@@ -275,9 +275,10 @@ function endCall() {
 
     updateCallUIState("idle");
 
-    // Refresh call list after short intervals to allow the bot to POST data to the worker
-    setTimeout(loadCalls, 1200);
-    setTimeout(loadCalls, 3000);
+    // Refresh call list after intervals to allow the bot to POST data over HTTPS to the remote worker
+    setTimeout(loadCalls, 1500);
+    setTimeout(loadCalls, 3500);
+    setTimeout(loadCalls, 6000);
 }
 
 // ----------------------------------------------------
