@@ -1,4 +1,4 @@
-name: Deploy Cloudflare Worker
+name: Deploy to Cloudflare (Worker, D1 & Pages)
 
 on:
   push:
@@ -7,19 +7,43 @@ on:
       - master
     paths:
       - 'worker/**'
+      - 'frontend/**'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy Worker
+    name: Deploy to Cloudflare
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Deploy to Cloudflare Workers
+      # Step 1: Apply D1 schema migrations to Cloudflare's remote database
+      - name: Apply D1 database migrations
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'worker'
+          command: d1 migrations apply call-log-db --remote
+
+      # Step 2: Deploy Worker backend REST API
+      - name: Deploy Worker API
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'worker'
+
+      # Step 3: Deploy Frontend to Cloudflare Pages
+      - name: Deploy Frontend to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy frontend/src --project-name=boombot --branch=main

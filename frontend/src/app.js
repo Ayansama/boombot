@@ -1,5 +1,5 @@
 const BOT_URL = "http://localhost:7860";
-const WORKER_URL = "http://localhost:8787";
+const WORKER_URL = "https://mini-call-log-worker.ayanforcode.workers.dev";
 
 let pc = null;  // RTCPeerConnection
 let dc = null;  // RTCDataChannel
@@ -254,7 +254,7 @@ function endCall() {
         pingInterval = null;
     }
     if (dc) {
-        try { dc.close(); } catch (e) {}
+        try { dc.close(); } catch (e) { }
         dc = null;
     }
     if (micStream) {
@@ -265,11 +265,11 @@ function endCall() {
         try {
             pc.getSenders().forEach(sender => {
                 if (sender.track) {
-                    try { sender.track.stop(); } catch (e) {}
+                    try { sender.track.stop(); } catch (e) { }
                 }
             });
             pc.close();
-        } catch (e) {}
+        } catch (e) { }
         pc = null;
     }
 
