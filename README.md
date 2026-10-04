@@ -285,3 +285,22 @@ CREATE TABLE call_metrics (
 | `GEMINI_MODEL` | ➖ | `gemini-3.8-flash` | Gemini model name |
 | `LLM_PROVIDER` | ➖ | `groq` | `groq` or `gemini` |
 | `WORKER_URL` | ➖ | `http://localhost:8787` | Base URL of the Cloudflare Worker |
+
+---
+
+## Observability & Real-Time Logs
+
+Worker telemetry and structured logging are enabled with 100% request sampling via the `[observability]` engine in `worker/wrangler.toml`.
+
+### View Logs in Cloudflare Dashboard:
+1. Open **[dash.cloudflare.com](https://dash.cloudflare.com/) → Workers & Pages → `mini-call-log-worker`**.
+2. Select **Logs** (or **Observability → Real-time Logs**).
+3. Click **Begin log stream** to view real-time HTTP requests, database write latencies, and structured `[API]` log output.
+
+### Stream Logs via CLI:
+```bash
+cd worker
+npx wrangler tail
+```
+Every incoming call record, query, status code, and latency will stream directly to your terminal.
+

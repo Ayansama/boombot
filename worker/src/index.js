@@ -2,6 +2,7 @@ export default {
     async fetch(request, env) {
         const url = new URL(request.url);
         const { pathname } = url;
+        const startTime = Date.now();
 
         // CORS headers: needed so browser can call the Worker
         const corsHeaders = {
@@ -12,6 +13,7 @@ export default {
 
         // Handle preflight
         if (request.method === "OPTIONS") {
+            console.log(`[API] 204 Preflight OPTIONS ${pathname}`);
             return new Response(null, { headers: corsHeaders });
         }
 
@@ -20,6 +22,8 @@ export default {
             if (pathname === "/calls" && request.method === "POST") {
                 const body = await request.json();
                 const { call_id, start_time, end_time, duration, transcript, metrics } = body;
+
+                console.log(`[API] POST /calls - Storing call ${call_id} (duration: ${duration}s)`);
 
                 // Insert into calls table
                 await env.DB.prepare(
@@ -45,6 +49,8 @@ export default {
                     }
                 }
 
+                const elapsed = Date.now() - startTime;
+                console.log(`[API] 201 Created - Call ${call_id} saved (${transcript?.length || 0} turns, ${metrics?.length || 0} metrics, ${elapsed}ms)`);
                 return Response.json({ success: true, call_id }, { status: 201, headers: corsHeaders });
             }
 
@@ -54,6 +60,8 @@ export default {
                     `SELECT id, start_time, end_time, duration, created_at FROM calls ORDER BY created_at DESC`
                 ).all();
 
+                const elapsed = Date.now() - startTime;
+                console.log(`[API] 200 OK - GET /calls returned ${results.length} calls (${elapsed}ms)`);
                 return Response.json(results, { headers: corsHeaders });
             }
 
@@ -67,6 +75,7 @@ export default {
                 ).bind(id).first();
 
                 if (!call) {
+                    console.warn(`[API] 404 Not Found - Call ${id} does not exist`);
                     return Response.json({ error: "Call not found" }, { status: 404, headers: corsHeaders });
                 }
 
@@ -78,13 +87,16 @@ export default {
                     `SELECT turn_index, stt_latency, llm_latency, tts_latency FROM call_metrics WHERE call_id = ?`
                 ).bind(id).all();
 
+                const elapsed = Date.now() - startTime;
+                console.log(`[API] 200 OK - GET /calls/${id} (${transcript.length} turns, ${metrics.length} metrics, ${elapsed}ms)`);
                 return Response.json({ ...call, transcript, metrics }, { headers: corsHeaders });
             }
 
+            console.warn(`[API] 404 Not Found - Route ${request.method} ${pathname}`);
             return Response.json({ error: "Not found" }, { status: 404, headers: corsHeaders });
 
         } catch (err) {
-            console.error(err);
+            console.error(`[API Error] ${request.method} ${pathname}:`, err);
             return Response.json({ error: err.message }, { status: 500, headers: corsHeaders });
         }
     }
