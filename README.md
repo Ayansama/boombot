@@ -1,155 +1,287 @@
 # boombot — Mini Call Log Service
 
-**boombot** is a real-time conversational voice assistant with an automated call logging and telemetry pipeline. Built with **Pipecat**, **WebRTC**, **Deepgram**, **Groq**, and **Cloudflare Workers + D1 SQLite**.
+A real-time AI voice agent with persistent call logging. Speak into your browser, get a live response from an LLM, and have every call — transcript, duration, and latency metrics — automatically saved to a cloud database.
 
 ---
 
-## Architecture Overview
+## Architecture
 
 ```
-                                  +---------------------------+
-                                  |    Browser (Frontend)     |
-                                  |   (Vanilla JS + WebRTC)   |
-                                  +-------------+-------------+
-                                                |
-                               WebRTC Audio In  |  WebRTC Audio Out
-                                                v
-+-----------------------------------------------------------------------------------------+
-|                                    boombot (Python)                                     |
-|  +---------------------+    +--------------------+    +-----------------------------+   |
-|  |    Deepgram STT     | -> |      Groq LLM      | -> |        Deepgram TTS         |   |
-|  |  (Nova Transcription|    | (Fast LPU Inference|    |    (Aura Audio Synthesis)   |   |
-|  +---------------------+    +--------------------+    +-----------------------------+   |
-|                                       |                                                 |
-|                        End-of-Call Telemetry Aggregator                                 |
-+---------------------------------------+-------------------------------------------------+
-                                        |
-                            HTTP POST   | Call Metadata, Transcripts &
-                            /calls      | Turn Latency Metrics
-                                        v
-                        +-------------------------------+
-                        |   Cloudflare Worker Backend   |
-                        |      + D1 SQLite Database     |
-                        +-------------------------------+
+Browser (WebRTC)
+    │
+    ├─── Audio In/Out ──► bot/bot.py  (Python · Pipecat 1.12.0)
+    │                          │
+    │                    ┌─────▼──────┐
+    │                    │  Pipeline  │
+    │                    │  STT  →  Deepgram Live
+    │                    │  LLM  →  Groq (default) / Gemini (opt-in)
+    │                    │  TTS  →  Deepgram Aura
+    │                    └─────┬──────┘
+    │                          │ POST /calls
+    └─── UI ──► frontend/      ▼
+                (Cloudflare  worker/src/index.js
+                 Pages)       (Cloudflare Worker + D1 SQLite)
 ```
 
----
-
-## Features
-
-- **Full-Duplex Voice Conversation**: Low-latency, bidirectional audio streaming using WebRTC (`aiortc` + `SmallWebRTC`).
-- **Streaming Speech-to-Text**: Real-time voice transcription powered by Deepgram.
-- **Ultra-Fast LLM Inference**: Conversational intelligence powered by Groq's high-speed inference engine.
-- **Natural Voice Synthesis**: Low-latency text-to-speech powered by Deepgram Aura.
-- **Automated Call Telemetry**: Automatically records call duration, timestamped conversation turns, and per-turn latency metrics (STT, LLM, TTS).
-- **Interactive Call Log Dashboard**: View past calls, review transcripts, and inspect performance latency metrics.
+| Layer | Technology |
+|---|---|
+| Voice Pipeline | Python, [Pipecat 1.12.0](https://github.com/pipecat-ai/pipecat), `SmallWebRTCTransport` |
+| STT | Deepgram Live Transcription |
+| LLM | Groq (`qwen/qwen3.8-27b`) · Google Gemini (`gemini-3.8-flash`) |
+| TTS | Deepgram Aura 2 (`asteria`, `athena`, `mars`) |
+| Backend API | Cloudflare Worker (JavaScript) |
+| Database | Cloudflare D1 (SQLite) |
+| Frontend | Vanilla JS, Cloudflare Pages |
+| CI/CD | GitHub Actions → Wrangler |
 
 ---
 
 ## Project Structure
 
-```text
-mini-call-log/
+```
+boombot/
 ├── bot/
-│   ├── bot.py                  # Pipecat WebRTC bot and telemetry pipeline
-│   ├── requirements.txt        # Pinned Python dependencies
-│   └── .env.example            # Environment variable template
+│   ├── bot.py              # Voice pipeline + WebRTC signaling server
+│   ├── requirements.txt
+│   ├── .env.example
+│   └── venv/
+│
 ├── worker/
-│   ├── src/
-│   │   └── index.js            # Cloudflare Worker API router
+│   ├── src/index.js        # Cloudflare Worker REST API
 │   ├── migrations/
-│   │   └── 0001_init.sql       # D1 database schema
-│   ├── wrangler.toml           # Worker & D1 database configuration
-│   └── package.json            # Worker development scripts
+│   │   └── 0001_init.sql   # D1 schema (calls, transcripts, call_metrics)
+│   ├── wrangler.toml
+│   └── package.json
+│
 ├── frontend/
 │   └── src/
-│       ├── index.html          # Web interface & call dashboard
-│       └── app.js              # WebRTC signaling, audio playback & API client
-├── build_log.md                # Development history, resolved issues & root causes
-└── README.md                   # Documentation and quickstart guide
+│       ├── index.html      # UI (voice controls, call history, detail modal)
+│       └── app.js          # WebRTC client + Worker API calls
+│
+└── .github/workflows/
+    └── deploy.yml          # CI: D1 migrations → Worker deploy → Pages deploy
 ```
 
 ---
 
-## Getting Started
+## Prerequisites
 
-### 1. Cloudflare Worker (Backend & Database)
-
-1. Navigate to the worker directory:
-   ```bash
-   cd worker
-   ```
-2. Initialize local D1 database schema:
-   ```bash
-   npx wrangler d1 execute call-log-db --local --file=migrations/0001_init.sql
-   ```
-3. Start the local worker server (runs on `http://127.0.0.1:8787`):
-   ```bash
-   npx wrangler dev
-   ```
+- Python 3.11+
+- Node.js 18+ (for Wrangler)
+- A [Cloudflare account](https://cloudflare.com) with Workers and D1 enabled
+- API keys for Deepgram and Groq (and optionally Google Gemini)
 
 ---
 
-### 2. Python Bot (Voice Pipeline)
+## Setup
 
-1. Navigate to the bot directory:
-   ```bash
-   cd bot
-   ```
-2. Create and activate a Python virtual environment:
-   ```bash
-   python -m venv venv
-   # Windows:
-   .\venv\Scripts\activate
-   # Linux / macOS:
-   source venv/bin/activate
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Configure environment variables:
-   Copy `.env.example` to `.env` and provide your API keys:
-   ```bash
-   cp .env.example .env
-   ```
-   ```env
-   DEEPGRAM_API_KEY=your_deepgram_api_key
-   GROQ_API_KEY=your_groq_api_key
-   CALL_LOG_API_URL=http://localhost:8787
-   ```
-5. Start the bot server (runs on `http://localhost:7860`):
-   ```bash
-   python bot.py
-   ```
-
----
-
-### 3. Frontend (Web Client)
-
-Open [frontend/src/index.html](file:///c:/Projects/mini-call-log/frontend/src/index.html) in your browser or serve using any static web server:
+### 1. Bot (Python voice pipeline)
 
 ```bash
-# Example using Python:
-cd frontend/src
-python -m http.server 3000
+cd bot
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+# macOS / Linux
+source venv/bin/activate
+
+pip install -r requirements.txt
 ```
-Open `http://localhost:3000` in your browser. Click **Start Call** to begin talking with **boombot**.
+
+Copy the example env file and fill in your keys:
+
+```bash
+cp .env.example .env
+```
+
+```env
+DEEPGRAM_API_KEY=your_deepgram_api_key
+GROQ_API_KEY=your_groq_api_key
+GEMINI_API_KEY=your_gemini_api_key     # optional
+GEMINI_MODEL=gemini-3.8-flash          # optional
+LLM_PROVIDER=groq                      # "groq" or "gemini"
+WORKER_URL=http://localhost:8787       # or your deployed Worker URL
+```
+
+Start the signaling server:
+
+```bash
+python bot.py
+# Listening on http://localhost:7860
+```
+
+### 2. Worker (Cloudflare backend)
+
+```bash
+cd worker
+npm install
+```
+
+Create a D1 database and update `wrangler.toml` with the returned `database_id`:
+
+```bash
+npx wrangler d1 create call-log-db
+```
+
+Apply the schema locally:
+
+```bash
+npm run d1:init
+```
+
+Run the Worker locally:
+
+```bash
+npm run dev
+# Listening on http://localhost:8787
+```
+
+### 3. Frontend
+
+Open `frontend/src/index.html` directly in your browser, or serve it with any static server. The `BOT_URL` and `WORKER_URL` constants at the top of `app.js` point to `localhost` by default.
+
+---
+
+## Deployment
+
+Set the following repository secrets in GitHub:
+
+| Secret | Value |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token with Worker + Pages + D1 access |
+| `CLOUDFLARE_ACCOUNT_ID` | Your Cloudflare account ID |
+
+Push to `main` or `master`. The workflow in `.github/workflows/deploy.yml` will:
+
+1. Apply D1 migrations to the remote database.
+2. Deploy the Worker API.
+3. Deploy the frontend to Cloudflare Pages.
+
+Update `BOT_URL` in `frontend/src/app.js` to wherever your Python bot is publicly hosted (e.g. a VPS or tunnel), and `WORKER_URL` to your deployed Worker URL.
 
 ---
 
 ## API Reference
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/calls` | `GET` | Retrieve list of all recorded calls |
-| `/calls/:id` | `GET` | Retrieve call details with transcript turns and latency metrics |
-| `/calls` | `POST` | Save completed call metadata, transcripts, and metrics |
+The Cloudflare Worker exposes three endpoints:
+
+### `POST /calls`
+Save a completed call. Called automatically by the bot at the end of each session.
+
+**Body:**
+```json
+{
+  "call_id": "uuid",
+  "start_time": "ISO 8601",
+  "end_time": "ISO 8601",
+  "duration": 42,
+  "transcript": [
+    { "role": "user" | "bot", "content": "...", "timestamp": "ISO 8601" }
+  ],
+  "metrics": [
+    { "turn_index": 0, "stt_latency": null, "llm_latency": 682, "tts_latency": 357 }
+  ]
+}
+```
+
+**Response:** `201 Created`
 
 ---
 
-## Database Schema (D1 SQLite)
+### `GET /calls`
+Returns all calls, newest first.
 
-- **`calls`**: `id` (UUID), `start_time`, `end_time`, `duration` (seconds), `created_at`.
-- **`transcripts`**: `id`, `call_id` (FK), `role` (`user` \| `bot`), `content`, `timestamp`.
-- **`call_metrics`**: `id`, `call_id` (FK), `turn_index`, `stt_latency` (ms), `llm_latency` (ms), `tts_latency` (ms).
+```json
+[
+  { "id": "...", "start_time": "...", "end_time": "...", "duration": 42, "created_at": "..." }
+]
+```
+
+---
+
+### `GET /calls/:id`
+Returns a single call with its full transcript and per-turn metrics.
+
+```json
+{
+  "id": "...",
+  "duration": 42,
+  "transcript": [...],
+  "metrics": [...]
+}
+```
+
+---
+
+## Voice Options
+
+Three Deepgram Aura 2 voices are available and can be selected before each call:
+
+| Key | Model |
+|---|---|
+| `asteria` | `aura-2-asteria-en` (default) |
+| `athena` | `aura-2-athena-en` |
+| `mars` | `aura-2-mars-en` |
+
+Voice is locked for the duration of a call and unlocked when the call ends.
+
+---
+
+## LLM Providers
+
+Toggle the provider with the `LLM_PROVIDER` environment variable.
+
+| Provider | Model | Avg LLM Latency | Notes |
+|---|---|---|---|
+| `groq` (default) | `qwen/qwen3.8-27b` | ~680 ms | Best for real-time voice; sub-700ms TTFT |
+| `gemini` | `gemini-3.8-flash` | ~6,200 ms | Richer reasoning; not recommended for voice |
+
+Groq is the default. Gemini is available as an opt-in for tasks where reasoning depth outweighs latency requirements.
+
+---
+
+## Database Schema
+
+```sql
+-- A completed call session
+CREATE TABLE calls (
+  id         TEXT PRIMARY KEY,
+  start_time TEXT NOT NULL,
+  end_time   TEXT NOT NULL,
+  duration   INTEGER NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Ordered transcript turns
+CREATE TABLE transcripts (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  call_id   TEXT NOT NULL REFERENCES calls(id),
+  role      TEXT NOT NULL CHECK(role IN ('user', 'bot')),
+  content   TEXT NOT NULL,
+  timestamp TEXT NOT NULL
+);
+
+-- Per-turn latency telemetry
+CREATE TABLE call_metrics (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  call_id     TEXT NOT NULL REFERENCES calls(id),
+  turn_index  INTEGER,
+  stt_latency INTEGER,
+  llm_latency INTEGER,
+  tts_latency INTEGER
+);
+```
+
+---
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `DEEPGRAM_API_KEY` | ✅ | — | Deepgram API key (STT + TTS) |
+| `GROQ_API_KEY` | ✅ | — | Groq API key |
+| `GEMINI_API_KEY` | ➖ | — | Google Gemini API key |
+| `GEMINI_MODEL` | ➖ | `gemini-3.8-flash` | Gemini model name |
+| `LLM_PROVIDER` | ➖ | `groq` | `groq` or `gemini` |
+| `WORKER_URL` | ➖ | `http://localhost:8787` | Base URL of the Cloudflare Worker |
